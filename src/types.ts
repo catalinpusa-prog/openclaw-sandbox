@@ -17,6 +17,16 @@ export interface MoltbotEnv {
   AI_GATEWAY_BASE_URL?: string; // AI Gateway URL (e.g., https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic)
   // Direct provider configuration
   ANTHROPIC_API_KEY?: string;
+    OPENROUTER_API_KEY?: string;
+    MOONSHOT_API_KEY?: string;
+
+    // Email credentials (passed to container for email skills)
+    EMAIL_ALEX_PASSWORD?: string;
+    EMAIL_CATALIN_PASSWORD?: string;
+    EMAIL_INFO_PASSWORD?: string;
+    IMAP_HOST?: string;
+    IMAP_USER?: string;
+    IMAP_PASSWORD?: string;
   ANTHROPIC_BASE_URL?: string;
   OPENAI_API_KEY?: string;
   MOLTBOT_GATEWAY_TOKEN?: string; // Gateway token (mapped to OPENCLAW_GATEWAY_TOKEN for container)
