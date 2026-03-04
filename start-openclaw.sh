@@ -318,6 +318,13 @@ echo "Gateway will be available on port 18789"
 rm -f /tmp/openclaw-gateway.lock 2>/dev/null || true
 rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
 
+# Fix any invalid/deprecated config keys from older R2 backups
+if [ -f "$CONFIG_FILE" ]; then
+    echo "Running openclaw doctor --fix to clean config..."
+        openclaw doctor --fix 2>&1 || echo "WARNING: openclaw doctor --fix returned non-zero (may be OK)"
+            echo "Doctor fix completed"
+            fi
+
 echo "Dev mode: ${OPENCLAW_DEV_MODE:-false}"
 
 if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
