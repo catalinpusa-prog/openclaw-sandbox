@@ -55,5 +55,19 @@ export function buildEnvVars(env: MoltbotEnv): Record<string, string> {
   if (env.R2_SECRET_ACCESS_KEY) envVars.R2_SECRET_ACCESS_KEY = env.R2_SECRET_ACCESS_KEY;
   if (env.R2_BUCKET_NAME) envVars.R2_BUCKET_NAME = env.R2_BUCKET_NAME;
 
+    // Additional AI provider keys
+    if (env.OPENROUTER_API_KEY) envVars.OPENROUTER_API_KEY = env.OPENROUTER_API_KEY;
+    if (env.MOONSHOT_API_KEY) envVars.MOONSHOT_API_KEY = env.MOONSHOT_API_KEY;
+
+    // Email credentials (used by email skills in the container)
+    if (env.EMAIL_ALEX_PASSWORD) envVars.EMAIL_ALEX_PASSWORD = env.EMAIL_ALEX_PASSWORD;
+    if (env.EMAIL_CATALIN_PASSWORD) envVars.EMAIL_CATALIN_PASSWORD = env.EMAIL_CATALIN_PASSWORD;
+    if (env.EMAIL_INFO_PASSWORD) envVars.EMAIL_INFO_PASSWORD = env.EMAIL_INFO_PASSWORD;
+
+    // IMAP configuration (used by email skills in the container)
+    if (env.IMAP_HOST) envVars.IMAP_HOST = env.IMAP_HOST;
+    if (env.IMAP_USER) envVars.IMAP_USER = env.IMAP_USER;
+    if (env.IMAP_PASSWORD) envVars.IMAP_PASSWORD = env.IMAP_PASSWORD;
+
   return envVars;
 }
