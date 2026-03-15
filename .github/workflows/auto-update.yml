@@ -1,0 +1,41 @@
+name: Auto-Update OpenClaw
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Check upstream
+        id: check
+        run: |
+          git remote add upstream https://github.com/cloudflare/moltworker.git 2>/dev/null || true
+          git fetch upstream main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse upstream/main)" ]; then
+            echo "update=true" >> $GITHUB_OUTPUT
+          else
+            echo "update=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Merge & Deploy
+        if: steps.check.outputs.update == 'true'
+        run: |
+          git config user.name "Auto-Update"
+          git config user.email "bot@local"
+          git merge upstream/main --no-edit
+          git push
+          npm install
+          npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Notify Telegram
+        if: steps.check.outputs.update == 'true'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TG_CHAT_ID }}" \
+            -d "text=🦞 OpenClaw CF updated $(date -u +%H:%M)"
+        continue-on-error: true
