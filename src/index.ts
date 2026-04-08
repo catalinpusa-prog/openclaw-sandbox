@@ -23,10 +23,10 @@
 import { Hono } from 'hono';
 import { getSandbox, Sandbox, type SandboxOptions } from '@cloudflare/sandbox';
 
-import type { AppEnv, MoltbotEnv } from './types';
-import { MOLTBOT_PORT } from './config';
+import type { AppEnv, OpenClawEnv } from './types';
+import { GATEWAY_PORT } from './config';
 import { createAccessMiddleware } from './auth';
-import { ensureMoltbotGateway, findExistingMoltbotProcess } from './gateway';
+import { ensureGateway, findExistingGatewayProcess } from './gateway';
 import { publicRoutes, api, adminUi, debug, cdp } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import loadingPageHtml from './assets/loading.html';
@@ -53,7 +53,7 @@ export { Sandbox };
  * Validate required environment variables.
  * Returns an array of missing variable descriptions, or empty array if all are set.
  */
-function validateRequiredEnv(env: MoltbotEnv): string[] {
+function validateRequiredEnv(env: OpenClawEnv): string[] {
   const missing: string[] = [];
   const isTestMode = env.DEV_MODE === 'true' || env.E2E_TEST_MODE === 'true';
 
@@ -102,7 +102,7 @@ function validateRequiredEnv(env: MoltbotEnv): string[] {
  *   npx wrangler secret put SANDBOX_SLEEP_AFTER
  *   # Enter: 10m (or 1h, 30m, etc.)
  */
-export function buildSandboxOptions(env: MoltbotEnv): SandboxOptions {
+export function buildSandboxOptions(env: OpenClawEnv): SandboxOptions {
   const sleepAfter = env.SANDBOX_SLEEP_AFTER?.toLowerCase() || 'never';
 
   // 'never' means keep the container alive indefinitely
@@ -135,7 +135,7 @@ app.use('*', async (c, next) => {
 // Middleware: Initialize sandbox for all requests
 app.use('*', async (c, next) => {
   const options = buildSandboxOptions(c.env);
-  const sandbox = getSandbox(c.env.Sandbox, 'moltbot', options);
+  const sandbox = getSandbox(c.env.Sandbox, 'openclaw', options);
   c.set('sandbox', sandbox);
   await next();
 });
@@ -234,7 +234,7 @@ app.all('*', async (c) => {
   console.log('[PROXY] Handling request:', url.pathname);
 
   // Check if gateway is already running
-  const existingProcess = await findExistingMoltbotProcess(sandbox);
+  const existingProcess = await findExistingGatewayProcess(sandbox);
   const isGatewayReady = existingProcess !== null && existingProcess.status === 'running';
 
   // For browser requests (non-WebSocket, non-API), show loading page if gateway isn't ready
@@ -246,7 +246,7 @@ app.all('*', async (c) => {
 
     // Start the gateway in the background (don't await)
     c.executionCtx.waitUntil(
-      ensureMoltbotGateway(sandbox, c.env).catch((err: Error) => {
+      ensureGateway(sandbox, c.env).catch((err: Error) => {
         console.error('[PROXY] Background gateway start failed:', err);
       }),
     );
@@ -257,7 +257,7 @@ app.all('*', async (c) => {
 
   // Ensure moltbot is running (this will wait for startup)
   try {
-    await ensureMoltbotGateway(sandbox, c.env);
+    await ensureGateway(sandbox, c.env);
   } catch (error) {
     console.error('[PROXY] Failed to start Moltbot:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -300,7 +300,7 @@ app.all('*', async (c) => {
     }
 
     // Get WebSocket connection to the container
-    const containerResponse = await sandbox.wsConnect(wsRequest, MOLTBOT_PORT);
+    const containerResponse = await sandbox.wsConnect(wsRequest, GATEWAY_PORT);
     console.log('[WS] wsConnect response status:', containerResponse.status);
 
     // Get the container-side WebSocket
@@ -429,7 +429,7 @@ app.all('*', async (c) => {
   }
 
   console.log('[HTTP] Proxying:', url.pathname + url.search);
-  const httpResponse = await sandbox.containerFetch(request, MOLTBOT_PORT);
+  const httpResponse = await sandbox.containerFetch(request, GATEWAY_PORT);
   console.log('[HTTP] Response status:', httpResponse.status);
 
   // Add debug header to verify worker handled the request
@@ -447,14 +447,14 @@ app.all('*', async (c) => {
 export default {
   fetch: app.fetch,
 
-  async scheduled(_event: ScheduledEvent, env: MoltbotEnv, ctx: ExecutionContext): Promise<void> {
+  async scheduled(_event: ScheduledEvent, env: OpenClawEnv, ctx: ExecutionContext): Promise<void> {
     // Keep the container alive by pinging it every 25 minutes.
     // Without this, Cloudflare evicts the Durable Object after ~45 min of inactivity,
     // sending SIGTERM to the container even though keepAlive: true is set.
-    const sandbox = getSandbox(env.Sandbox, 'moltbot', buildSandboxOptions(env));
+    const sandbox = getSandbox(env.Sandbox, 'openclaw', buildSandboxOptions(env));
     ctx.waitUntil(
       sandbox
-        .containerFetch(new Request('http://localhost/sandbox-health'), MOLTBOT_PORT)
+        .containerFetch(new Request('http://localhost/sandbox-health'), GATEWAY_PORT)
         .then((r) => console.log('[KEEPALIVE] Cron ping status:', r.status))
         .catch((e: Error) =>
           console.log('[KEEPALIVE] Cron ping skipped (container cold):', e.message),
