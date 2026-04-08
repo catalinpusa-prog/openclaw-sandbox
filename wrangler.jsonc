@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "moltbot-sandbox",
+  "name": "openclaw-sandbox",
   "main": "src/index.ts",
   "compatibility_date": "2025-05-06",
   "compatibility_flags": ["nodejs_compat"],
@@ -55,27 +55,25 @@
       "tag": "v1",
     },
   ],
-  // R2 bucket for Sandbox SDK backup/restore (squashfs snapshots).
-  // The binding name BACKUP_BUCKET is required by @cloudflare/sandbox.
+  // R2 bucket for persistent storage (moltbot data, conversations, etc.)
   "r2_buckets": [
     {
-      "binding": "BACKUP_BUCKET",
+      "binding": "MOLTBOT_BUCKET",
       "bucket_name": "moltbot-data",
     },
   ],
+
+  // Cron trigger: ping sandbox every 25 minutes to keep the container alive
+  // (prevents Durable Object eviction due to inactivity)
+  "triggers": {
+    "crons": ["*/25 * * * *"],
+  },
 
   // Browser Rendering binding for CDP shim
   "browser": {
     "binding": "BROWSER",
   },
-  // Cron trigger to wake the container before OpenClaw cron jobs fire.
-  // The worker reads the cron job store from R2 and wakes the container
-  // if any job is scheduled within the lead time (default: 10 minutes).
-  // Adjust the interval to match your needs. Every 1 minute ensures
-  // jobs are never missed by more than 1 minute.
-  "triggers": {
-    "crons": ["* * * * *"],
-  },
+  // Note: CF_ACCOUNT_ID should be set via `wrangler secret put CF_ACCOUNT_ID`
   // Secrets to configure via `wrangler secret put`:
   //
   // AI Provider (at least one set required):
@@ -101,9 +99,8 @@
   // - CDP_SECRET: Shared secret for /cdp endpoint authentication
   // - WORKER_URL: Public URL of the worker
   //
-  // R2 persistent storage (for data persistence across container restarts):
+  // R2 persistent storage (optional, for data persistence across sessions):
   // - R2_ACCESS_KEY_ID: R2 access key ID (from R2 API tokens)
   // - R2_SECRET_ACCESS_KEY: R2 secret access key (from R2 API tokens)
-  // - CLOUDFLARE_ACCOUNT_ID: Your Cloudflare account ID
-  // - BACKUP_BUCKET_NAME: R2 bucket name (default: moltbot-data)
+  // - CF_ACCOUNT_ID: Your Cloudflare account ID (for R2 endpoint URL)
 }
