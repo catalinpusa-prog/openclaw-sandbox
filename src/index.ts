@@ -446,4 +446,19 @@ app.all('*', async (c) => {
 
 export default {
   fetch: app.fetch,
+
+  async scheduled(_event: ScheduledEvent, env: MoltbotEnv, ctx: ExecutionContext): Promise<void> {
+    // Keep the container alive by pinging it every 25 minutes.
+    // Without this, Cloudflare evicts the Durable Object after ~45 min of inactivity,
+    // sending SIGTERM to the container even though keepAlive: true is set.
+    const sandbox = getSandbox(env.Sandbox, 'moltbot', buildSandboxOptions(env));
+    ctx.waitUntil(
+      sandbox
+        .containerFetch(new Request('http://localhost/sandbox-health'), MOLTBOT_PORT)
+        .then((r) => console.log('[KEEPALIVE] Cron ping status:', r.status))
+        .catch((e: Error) =>
+          console.log('[KEEPALIVE] Cron ping skipped (container cold):', e.message),
+        ),
+    );
+  },
 };

@@ -3,39 +3,77 @@ on:
   schedule:
     - cron: '0 4 * * *'
   workflow_dispatch:
+
 jobs:
   update-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - name: Check upstream
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Check upstream for changes
         id: check
         run: |
           git remote add upstream https://github.com/cloudflare/moltworker.git 2>/dev/null || true
           git fetch upstream main
           if [ "$(git rev-parse HEAD)" != "$(git rev-parse upstream/main)" ]; then
             echo "update=true" >> $GITHUB_OUTPUT
+            echo "Upstream has new commits — will merge."
           else
             echo "update=false" >> $GITHUB_OUTPUT
+            echo "Already up-to-date with upstream."
           fi
-      - name: Merge & Deploy
+
+      - name: Merge upstream & restore custom config
         if: steps.check.outputs.update == 'true'
         run: |
-          git config user.name "Auto-Update"
-          git config user.email "bot@local"
-          git merge upstream/main --no-edit
+          git config user.name "Auto-Update Bot"
+          git config user.email "bot@users.noreply.github.com"
+
+          # Save our custom files before merge
+          cp Dockerfile /tmp/Dockerfile.custom
+          cp wrangler.jsonc /tmp/wrangler.jsonc.custom
+          cp src/index.ts /tmp/index.ts.custom
+          cp start-openclaw.sh /tmp/start-openclaw.sh.custom
+          cp .github/workflows/auto-update.yml /tmp/auto-update.yml.custom
+
+          # Merge upstream (accept upstream changes for everything else)
+          git merge upstream/main --no-edit --allow-unrelated-histories -X theirs || true
+
+          # Restore our custom files (overwrite any upstream changes to these)
+          cp /tmp/Dockerfile.custom Dockerfile
+          cp /tmp/wrangler.jsonc.custom wrangler.jsonc
+          cp /tmp/index.ts.custom src/index.ts
+          cp /tmp/start-openclaw.sh.custom start-openclaw.sh
+          cp /tmp/auto-update.yml.custom .github/workflows/auto-update.yml
+
+          # Commit if anything changed
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: merge upstream moltworker, preserve custom config"
           git push
-          npm install
+
+      - name: Deploy to Cloudflare
+        if: steps.check.outputs.update == 'true'
+        run: |
+          npm ci
           npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - name: Notify Telegram
         if: steps.check.outputs.update == 'true'
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TG_CHAT_ID }}" \
-            -d "text=🦞 OpenClaw CF updated $(date -u +%H:%M)"
+            -d "text=🦞 OpenClaw CF updated from upstream at $(date -u +'%Y-%m-%d %H:%M UTC')"
         continue-on-error: true

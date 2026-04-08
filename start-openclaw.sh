@@ -21,6 +21,11 @@ SKILLS_DIR="/root/clawd/skills"
 RCLONE_CONF="/root/.config/rclone/rclone.conf"
 LAST_SYNC_FILE="/tmp/.last-sync"
 
+# Backwards compat: MOLTBOT_GATEWAY_TOKEN -> OPENCLAW_GATEWAY_TOKEN
+if [ -z "$OPENCLAW_GATEWAY_TOKEN" ] && [ -n "$MOLTBOT_GATEWAY_TOKEN" ]; then
+    export OPENCLAW_GATEWAY_TOKEN="$MOLTBOT_GATEWAY_TOKEN"
+fi
+
 echo "Config directory: $CONFIG_DIR"
 
 mkdir -p "$CONFIG_DIR"

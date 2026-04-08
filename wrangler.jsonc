@@ -63,6 +63,12 @@
     },
   ],
 
+  // Cron trigger: ping sandbox every 25 minutes to keep the container alive
+  // (prevents Durable Object eviction due to inactivity)
+  "triggers": {
+    "crons": ["*/25 * * * *"],
+  },
+
   // Browser Rendering binding for CDP shim
   "browser": {
     "binding": "BROWSER",
