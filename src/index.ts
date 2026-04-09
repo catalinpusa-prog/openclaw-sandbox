@@ -151,6 +151,7 @@ app.route('/', publicRoutes);
 // Mount CDP routes (uses shared secret auth via query param, not CF Access)
 app.route('/cdp', cdp);
 
+
 // =============================================================================
 // PROTECTED ROUTES: Cloudflare Access authentication required
 // =============================================================================
@@ -297,6 +298,17 @@ app.all('*', async (c) => {
       const tokenUrl = new URL(url.toString());
       tokenUrl.searchParams.set('token', c.env.MOLTBOT_GATEWAY_TOKEN);
       wsRequest = new Request(tokenUrl.toString(), request);
+    }
+
+    // Strip the Origin header so the gateway skips its origin check.
+    // The browser sets Origin to the Worker's public URL, but the gateway
+    // sees the connection coming from the container-internal network.
+    // Without an Origin header the gateway treats it as a non-browser client
+    // and bypasses the controlUi.allowedOrigins check.
+    {
+      const wsHeaders = new Headers(wsRequest.headers);
+      wsHeaders.delete('Origin');
+      wsRequest = new Request(wsRequest.url, { headers: wsHeaders, method: wsRequest.method });
     }
 
     // Get WebSocket connection to the container
