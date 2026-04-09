@@ -55,10 +55,10 @@
       "tag": "v1",
     },
   ],
-  // R2 bucket for persistent storage (moltbot data, conversations, etc.)
+  // R2 bucket for persistent storage — binding name must match OpenClawEnv.BACKUP_BUCKET
   "r2_buckets": [
     {
-      "binding": "MOLTBOT_BUCKET",
+      "binding": "BACKUP_BUCKET",
       "bucket_name": "moltbot-data",
     },
   ],

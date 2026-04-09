@@ -174,6 +174,19 @@ if (process.env.OPENCLAW_DEV_MODE === 'true') {
     config.gateway.controlUi.allowInsecureAuth = true;
 }
 
+// Allow the Worker's public URL as a trusted Control UI origin.
+// Required because the Control UI is served via the CF Worker proxy,
+// not directly from the gateway host.
+if (process.env.WORKER_URL) {
+    config.gateway.controlUi = config.gateway.controlUi || {};
+    const origins = config.gateway.controlUi.allowedOrigins || [];
+    if (!origins.includes(process.env.WORKER_URL)) {
+        origins.push(process.env.WORKER_URL);
+    }
+    config.gateway.controlUi.allowedOrigins = origins;
+    console.log('Allowed Control UI origins:', config.gateway.controlUi.allowedOrigins);
+}
+
 // Legacy AI Gateway base URL override:
 // ANTHROPIC_BASE_URL is picked up natively by the Anthropic SDK,
 // so we don't need to patch the provider config. Writing a provider
