@@ -45,6 +45,11 @@ export interface OpenClawEnv {
 
   // Cron wake-ahead: wake container before OpenClaw cron jobs fire
   CRON_WAKE_AHEAD_MINUTES?: string; // Minutes before a cron job to wake the container (default: 10)
+
+  // Email account passwords for Himalaya IMAP/SMTP configuration
+  EMAIL_INFO_PASSWORD?: string; // Password for info@pusa.ro
+  EMAIL_ALEX_PASSWORD?: string; // Password for alex@pusa.ro
+  EMAIL_CATALIN_PASSWORD?: string; // Password for catalin.pusa@avocatul-meu.ro
 }
 
 /**
