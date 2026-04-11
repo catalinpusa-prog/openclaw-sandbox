@@ -52,14 +52,17 @@ export function buildEnvVars(env: OpenClawEnv): Record<string, string> {
   if (env.CDP_SECRET) envVars.CDP_SECRET = env.CDP_SECRET;
   if (env.WORKER_URL) envVars.WORKER_URL = env.WORKER_URL;
 
+  // R2 credentials for rclone-based sync in start-openclaw.sh
+  // start-openclaw.sh checks for R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CF_ACCOUNT_ID
+  if (env.R2_ACCESS_KEY_ID) envVars.R2_ACCESS_KEY_ID = env.R2_ACCESS_KEY_ID;
+  if (env.R2_SECRET_ACCESS_KEY) envVars.R2_SECRET_ACCESS_KEY = env.R2_SECRET_ACCESS_KEY;
+  // Map CLOUDFLARE_ACCOUNT_ID -> CF_ACCOUNT_ID (name expected by start-openclaw.sh and rclone)
+  if (env.CLOUDFLARE_ACCOUNT_ID) envVars.CF_ACCOUNT_ID = env.CLOUDFLARE_ACCOUNT_ID;
+
   // Email account passwords for Himalaya IMAP/SMTP configuration
   if (env.EMAIL_INFO_PASSWORD) envVars.EMAIL_INFO_PASSWORD = env.EMAIL_INFO_PASSWORD;
   if (env.EMAIL_ALEX_PASSWORD) envVars.EMAIL_ALEX_PASSWORD = env.EMAIL_ALEX_PASSWORD;
   if (env.EMAIL_CATALIN_PASSWORD) envVars.EMAIL_CATALIN_PASSWORD = env.EMAIL_CATALIN_PASSWORD;
-
-  // Note: R2 credentials are no longer passed to the container.
-  // Persistence is handled by the Sandbox SDK's backup/restore API,
-  // which uses presigned URLs from the Worker side.
 
   return envVars;
 }
