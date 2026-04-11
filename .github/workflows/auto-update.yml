@@ -21,8 +21,23 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Check openclaw npm version
+        id: openclaw
+        run: |
+          LATEST=$(npm show openclaw version)
+          CURRENT=$(grep -oP 'openclaw@\K[0-9.]+' Dockerfile | head -1)
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          if [ "$LATEST" != "$CURRENT" ]; then
+            echo "update=true" >> $GITHUB_OUTPUT
+            echo "New openclaw version available: $CURRENT -> $LATEST"
+          else
+            echo "update=false" >> $GITHUB_OUTPUT
+            echo "OpenClaw already up-to-date: $CURRENT"
+          fi
+
       - name: Check upstream for changes
-        id: check
+        id: upstream
         run: |
           git remote add upstream https://github.com/cloudflare/moltworker.git 2>/dev/null || true
           git fetch upstream main
@@ -34,21 +49,23 @@ jobs:
             echo "Already up-to-date with upstream."
           fi
 
-      - name: Merge upstream & restore custom config
-        if: steps.check.outputs.update == 'true'
+      - name: Apply all updates
+        if: steps.openclaw.outputs.update == 'true' || steps.upstream.outputs.update == 'true'
         run: |
           git config user.name "Auto-Update Bot"
           git config user.email "bot@users.noreply.github.com"
 
-          # Save our custom files before merge
+          # Save our custom files before any upstream merge
           cp Dockerfile /tmp/Dockerfile.custom
           cp wrangler.jsonc /tmp/wrangler.jsonc.custom
           cp src/index.ts /tmp/index.ts.custom
           cp start-openclaw.sh /tmp/start-openclaw.sh.custom
           cp .github/workflows/auto-update.yml /tmp/auto-update.yml.custom
 
-          # Merge upstream (accept upstream changes for everything else)
-          git merge upstream/main --no-edit --allow-unrelated-histories -X theirs || true
+          # Merge upstream if needed (accept upstream changes for everything else)
+          if [ "${{ steps.upstream.outputs.update }}" == "true" ]; then
+            git merge upstream/main --no-edit --allow-unrelated-histories -X theirs || true
+          fi
 
           # Restore our custom files (overwrite any upstream changes to these)
           cp /tmp/Dockerfile.custom Dockerfile
@@ -57,13 +74,41 @@ jobs:
           cp /tmp/start-openclaw.sh.custom start-openclaw.sh
           cp /tmp/auto-update.yml.custom .github/workflows/auto-update.yml
 
-          # Commit if anything changed
+          # Upgrade openclaw version in Dockerfile if needed
+          if [ "${{ steps.openclaw.outputs.update }}" == "true" ]; then
+            CURRENT="${{ steps.openclaw.outputs.current }}"
+            LATEST="${{ steps.openclaw.outputs.latest }}"
+            sed -i "s/openclaw@${CURRENT}/openclaw@${LATEST}/g" Dockerfile
+            echo "Dockerfile updated: openclaw@${CURRENT} -> openclaw@${LATEST}"
+          fi
+
+          # Commit everything (if anything changed)
           git add -A
-          git diff --cached --quiet || git commit -m "chore: merge upstream moltworker, preserve custom config"
-          git push
+          if ! git diff --cached --quiet; then
+            UPSTREAM_MSG=""
+            OPENCLAW_MSG=""
+            if [ "${{ steps.upstream.outputs.update }}" == "true" ]; then
+              UPSTREAM_MSG="merge upstream moltworker"
+            fi
+            if [ "${{ steps.openclaw.outputs.update }}" == "true" ]; then
+              OPENCLAW_MSG="upgrade openclaw ${{ steps.openclaw.outputs.current }} -> ${{ steps.openclaw.outputs.latest }}"
+            fi
+            # Build commit message from what actually changed
+            if [ -n "$UPSTREAM_MSG" ] && [ -n "$OPENCLAW_MSG" ]; then
+              MSG="chore: ${OPENCLAW_MSG}, ${UPSTREAM_MSG}"
+            elif [ -n "$OPENCLAW_MSG" ]; then
+              MSG="chore: ${OPENCLAW_MSG}"
+            else
+              MSG="chore: ${UPSTREAM_MSG}"
+            fi
+            git commit -m "$MSG"
+            git push
+          else
+            echo "No changes to commit."
+          fi
 
       - name: Deploy to Cloudflare
-        if: steps.check.outputs.update == 'true'
+        if: steps.openclaw.outputs.update == 'true' || steps.upstream.outputs.update == 'true'
         run: |
           npm ci
           npx wrangler deploy
@@ -71,9 +116,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Notify Telegram
-        if: steps.check.outputs.update == 'true'
+        if: steps.openclaw.outputs.update == 'true' || steps.upstream.outputs.update == 'true'
         run: |
+          MSG="🦞 OpenClaw sandbox updated at $(date -u +'%Y-%m-%d %H:%M UTC')"
+          if [ "${{ steps.openclaw.outputs.update }}" == "true" ]; then
+            MSG="${MSG}%0A📦 openclaw ${{ steps.openclaw.outputs.current }} → ${{ steps.openclaw.outputs.latest }}"
+          fi
+          if [ "${{ steps.upstream.outputs.update }}" == "true" ]; then
+            MSG="${MSG}%0A🔄 Worker updated from upstream"
+          fi
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TG_CHAT_ID }}" \
-            -d "text=🦞 OpenClaw CF updated from upstream at $(date -u +'%Y-%m-%d %H:%M UTC')"
+            -d "text=${MSG}"
         continue-on-error: true
