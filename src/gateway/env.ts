@@ -52,6 +52,11 @@ export function buildEnvVars(env: OpenClawEnv): Record<string, string> {
   if (env.CDP_SECRET) envVars.CDP_SECRET = env.CDP_SECRET;
   if (env.WORKER_URL) envVars.WORKER_URL = env.WORKER_URL;
 
+  // Email account passwords for Himalaya IMAP/SMTP configuration
+  if (env.EMAIL_INFO_PASSWORD) envVars.EMAIL_INFO_PASSWORD = env.EMAIL_INFO_PASSWORD;
+  if (env.EMAIL_ALEX_PASSWORD) envVars.EMAIL_ALEX_PASSWORD = env.EMAIL_ALEX_PASSWORD;
+  if (env.EMAIL_CATALIN_PASSWORD) envVars.EMAIL_CATALIN_PASSWORD = env.EMAIL_CATALIN_PASSWORD;
+
   // Note: R2 credentials are no longer passed to the container.
   // Persistence is handled by the Sandbox SDK's backup/restore API,
   // which uses presigned URLs from the Worker side.
