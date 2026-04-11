@@ -159,6 +159,13 @@ try {
 config.gateway = config.gateway || {};
 config.channels = config.channels || {};
 
+// Migrate stale R2 config: remove keys that are no longer valid in newer OpenClaw versions
+if (config.models && config.models.allowed) {
+    delete config.models.allowed;
+    if (Object.keys(config.models).length === 0) delete config.models;
+    console.log('Migrated: removed stale models.allowed key');
+}
+
 // Gateway configuration
 config.gateway.port = 18789;
 config.gateway.mode = 'local';
@@ -173,12 +180,6 @@ config.gateway.controlUi = config.gateway.controlUi || {};
 
 // Always allow insecure auth (Control UI served via CF Worker proxy, not directly)
 config.gateway.controlUi.allowInsecureAuth = true;
-
-// When token auth is configured, bypass device pairing requirement.
-// The gateway token is the authentication mechanism — pairing is redundant.
-if (process.env.OPENCLAW_GATEWAY_TOKEN) {
-    config.gateway.dangerouslyDisableDeviceAuth = true;
-}
 
 // Always set allowedOrigins from WORKER_URL — replaces any stale value from R2 backup.
 // This ensures the Control UI always works after container restarts.
