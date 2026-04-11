@@ -169,22 +169,26 @@ if (process.env.OPENCLAW_GATEWAY_TOKEN) {
     config.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN;
 }
 
-if (process.env.OPENCLAW_DEV_MODE === 'true') {
-    config.gateway.controlUi = config.gateway.controlUi || {};
-    config.gateway.controlUi.allowInsecureAuth = true;
+config.gateway.controlUi = config.gateway.controlUi || {};
+
+// Always allow insecure auth (Control UI served via CF Worker proxy, not directly)
+config.gateway.controlUi.allowInsecureAuth = true;
+
+// When token auth is configured, bypass device pairing requirement.
+// The gateway token is the authentication mechanism — pairing is redundant.
+if (process.env.OPENCLAW_GATEWAY_TOKEN) {
+    config.gateway.dangerouslyDisableDeviceAuth = true;
 }
 
-// Allow the Worker's public URL as a trusted Control UI origin.
-// Required because the Control UI is served via the CF Worker proxy,
-// not directly from the gateway host.
+// Always set allowedOrigins from WORKER_URL — replaces any stale value from R2 backup.
+// This ensures the Control UI always works after container restarts.
 if (process.env.WORKER_URL) {
-    config.gateway.controlUi = config.gateway.controlUi || {};
-    const origins = config.gateway.controlUi.allowedOrigins || [];
-    if (!origins.includes(process.env.WORKER_URL)) {
-        origins.push(process.env.WORKER_URL);
-    }
-    config.gateway.controlUi.allowedOrigins = origins;
-    console.log('Allowed Control UI origins:', config.gateway.controlUi.allowedOrigins);
+    config.gateway.controlUi.allowedOrigins = [process.env.WORKER_URL];
+    console.log('Control UI allowed origin:', process.env.WORKER_URL);
+} else {
+    // Fallback: allow all origins if WORKER_URL is not set
+    config.gateway.controlUi.allowedOrigins = ['*'];
+    console.log('WORKER_URL not set — allowing all Control UI origins (fallback)');
 }
 
 // Legacy AI Gateway base URL override:
@@ -410,3 +414,4 @@ else
     echo "Starting gateway with device pairing (no token)..."
     exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan
 fi
+
