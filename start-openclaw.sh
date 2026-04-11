@@ -406,6 +406,13 @@ echo "Gateway will be available on port 18789"
 rm -f /tmp/openclaw-gateway.lock 2>/dev/null || true
 rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
 
+# Kill any zombie processes still holding port 18789
+# (can happen when gateway/restart kills the tracked process but leaves orphans)
+fuser -k 18789/tcp 2>/dev/null || true
+pkill -9 -f "openclaw gateway" 2>/dev/null || true
+pkill -9 -f "openclaw-gateway" 2>/dev/null || true
+sleep 1
+
 echo "Dev mode: ${OPENCLAW_DEV_MODE:-false}"
 
 if [ -n "$OPENCLAW_GATEWAY_TOKEN" ]; then
