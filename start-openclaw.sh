@@ -181,16 +181,12 @@ config.gateway.controlUi = config.gateway.controlUi || {};
 // Always allow insecure auth (Control UI served via CF Worker proxy, not directly)
 config.gateway.controlUi.allowInsecureAuth = true;
 
-// Always set allowedOrigins from WORKER_URL — replaces any stale value from R2 backup.
-// This ensures the Control UI always works after container restarts.
-if (process.env.WORKER_URL) {
-    config.gateway.controlUi.allowedOrigins = [process.env.WORKER_URL];
-    console.log('Control UI allowed origin:', process.env.WORKER_URL);
-} else {
-    // Fallback: allow all origins if WORKER_URL is not set
-    config.gateway.controlUi.allowedOrigins = ['*'];
-    console.log('WORKER_URL not set — allowing all Control UI origins (fallback)');
-}
+// Always set allowedOrigins — hardcoded fallback guarantees Control UI works
+// even if WORKER_URL env var is missing (e.g. after upstream overwrites env.ts)
+const HARDCODED_WORKER_URL = 'https://openclaw-sandbox.alex-046.workers.dev';
+const workerUrl = process.env.WORKER_URL || HARDCODED_WORKER_URL;
+config.gateway.controlUi.allowedOrigins = [workerUrl];
+console.log('Control UI allowed origin:', workerUrl);
 
 // Legacy AI Gateway base URL override:
 // ANTHROPIC_BASE_URL is picked up natively by the Anthropic SDK,
@@ -240,6 +236,74 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
     } else {
         console.warn('CF_AI_GATEWAY_MODEL set but missing required config (account ID, gateway ID, or API key)');
     }
+}
+
+// ── LLM Providers ──────────────────────────────────────────────────────────
+// Configured from Worker secrets. Each provider is re-applied on every start
+// so that secrets added/changed in Cloudflare take effect after restart.
+
+// OpenRouter provider (qwen3 free, kimi via OpenRouter, etc.)
+if (process.env.OPENROUTER_API_KEY) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['openrouter'] = {
+        baseUrl: 'https://openrouter.ai/api/v1',
+        apiKey: process.env.OPENROUTER_API_KEY,
+        api: 'openai-completions',
+        models: [
+            { id: 'qwen/qwen3-235b-a22b:free',  name: 'Qwen3 235B MoE (free)',  contextWindow: 40960,  maxTokens: 8192  },
+            { id: 'qwen/qwen3-30b-a3b:free',    name: 'Qwen3 30B MoE (free)',   contextWindow: 40960,  maxTokens: 8192  },
+            { id: 'qwen/qwen3-14b:free',         name: 'Qwen3 14B (free)',       contextWindow: 40960,  maxTokens: 8192  },
+            { id: 'qwen/qwen3-8b:free',          name: 'Qwen3 8B (free)',        contextWindow: 40960,  maxTokens: 8192  },
+            { id: 'moonshotai/kimi-k1.5',        name: 'Kimi K1.5 (OpenRouter)', contextWindow: 131072, maxTokens: 8192  },
+            { id: 'moonshotai/kimi-k2:free',     name: 'Kimi K2 (free)',         contextWindow: 131072, maxTokens: 8192  },
+        ],
+    };
+    console.log('OpenRouter provider configured');
+}
+
+// Moonshot / Kimi provider (direct API)
+if (process.env.MOONSHOT_API_KEY) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['moonshot'] = {
+        baseUrl: 'https://api.moonshot.cn/v1',
+        apiKey: process.env.MOONSHOT_API_KEY,
+        api: 'openai-completions',
+        models: [
+            { id: 'moonshot-v1-128k', name: 'Moonshot 128K',  contextWindow: 131072, maxTokens: 32768 },
+            { id: 'moonshot-v1-32k',  name: 'Moonshot 32K',   contextWindow: 32768,  maxTokens: 32768 },
+            { id: 'moonshot-v1-8k',   name: 'Moonshot 8K',    contextWindow: 8192,   maxTokens: 8192  },
+            { id: 'kimi-k2',          name: 'Kimi K2',         contextWindow: 131072, maxTokens: 8192  },
+            { id: 'kimi-latest',      name: 'Kimi latest',     contextWindow: 131072, maxTokens: 8192  },
+        ],
+    };
+    console.log('Moonshot provider configured');
+}
+
+// Anthropic models — provider configured via onboard (ANTHROPIC_API_KEY).
+// Explicitly register models so they appear in Control UI model picker.
+if (process.env.ANTHROPIC_API_KEY) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['anthropic'] = {
+        api: 'anthropic-messages',
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        models: [
+            { id: 'claude-opus-4-6',              name: 'Claude Opus 4.6',    contextWindow: 200000, maxTokens: 32768 },
+            { id: 'claude-sonnet-4-6',             name: 'Claude Sonnet 4.6', contextWindow: 200000, maxTokens: 16384 },
+            { id: 'claude-haiku-4-5-20251001',     name: 'Claude Haiku 4.5',  contextWindow: 200000, maxTokens: 16384 },
+            { id: 'claude-opus-4-5',               name: 'Claude Opus 4.5',   contextWindow: 200000, maxTokens: 32768 },
+            { id: 'claude-sonnet-4-5',             name: 'Claude Sonnet 4.5', contextWindow: 200000, maxTokens: 16384 },
+        ],
+    };
+    // Keep claude-sonnet-4-6 as primary default
+    config.agents = config.agents || {};
+    config.agents.defaults = config.agents.defaults || {};
+    if (!config.agents.defaults.model) {
+        config.agents.defaults.model = { primary: 'anthropic/claude-sonnet-4-6' };
+    }
+    console.log('Anthropic provider configured with', Object.keys(config.models.providers).length, 'total providers');
 }
 
 // Telegram configuration
@@ -422,4 +486,5 @@ else
     echo "Starting gateway with device pairing (no token)..."
     exec openclaw gateway --port 18789 --verbose --allow-unconfigured --bind lan
 fi
+
 
