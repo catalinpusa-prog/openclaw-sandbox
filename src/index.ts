@@ -300,14 +300,14 @@ app.all('*', async (c) => {
       wsRequest = new Request(tokenUrl.toString(), request);
     }
 
-    // Strip the Origin header so the gateway skips its origin check.
-    // The browser sets Origin to the Worker's public URL, but the gateway
-    // sees the connection coming from the container-internal network.
-    // Without an Origin header the gateway treats it as a non-browser client
-    // and bypasses the controlUi.allowedOrigins check.
+    // Ensure Origin header matches the worker's own URL, which is what we set
+    // in gateway.controlUi.allowedOrigins via start-openclaw.sh.
+    // Newer OpenClaw versions (2026.4.10+) require Origin to be present and match
+    // allowedOrigins — stripping no longer bypasses the check.
     {
       const wsHeaders = new Headers(wsRequest.headers);
-      wsHeaders.delete('Origin');
+      const workerOrigin = `https://${url.hostname}`;
+      wsHeaders.set('Origin', workerOrigin);
       wsRequest = new Request(wsRequest.url, { headers: wsHeaders, method: wsRequest.method });
     }
 
