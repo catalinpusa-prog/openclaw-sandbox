@@ -136,6 +136,28 @@ else
 fi
 
 # ============================================================
+# INSTALL CLAWHUB SKILLS
+# ============================================================
+# Skills are installed here (before gateway start) so they persist to R2 via
+# the sync loop. Installation is skipped if the skill directory already exists
+# (restored from R2 or previously installed on an earlier container start).
+mkdir -p "$SKILLS_DIR"
+CLAWHUB_SKILLS=(
+    "asleep123/caldav-calendar"
+    "xk103295870-alt/seedance-prompt-wizard"
+    "vassiliylakhonin/vassili-clawhub-cli"
+)
+for skill in "${CLAWHUB_SKILLS[@]}"; do
+    skill_name="${skill##*/}"
+    if [ ! -d "$SKILLS_DIR/$skill_name" ]; then
+        echo "Installing ClawHub skill: $skill ..."
+        openclaw skills install "$skill" 2>&1 && echo "Installed: $skill" || echo "WARNING: failed to install $skill (continuing)"
+    else
+        echo "Skill already present: $skill_name (skipping)"
+    fi
+done
+
+# ============================================================
 # PATCH CONFIG (channels, gateway auth, trusted proxies)
 # ============================================================
 # openclaw onboard handles provider/model config, but we need to patch in:
