@@ -181,6 +181,11 @@ config.gateway.controlUi = config.gateway.controlUi || {};
 // Always allow insecure auth (Control UI served via CF Worker proxy, not directly)
 config.gateway.controlUi.allowInsecureAuth = true;
 
+// Disable device pairing requirement for Control UI.
+// Must be at controlUi level — NOT at gateway root (that key is unrecognized at root).
+// This sets allowBypass=true which skips the pairing check for operator-role connections.
+config.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
+
 // Always set allowedOrigins — hardcoded fallback guarantees Control UI works
 // even if WORKER_URL env var is missing (e.g. after upstream overwrites env.ts)
 const HARDCODED_WORKER_URL = 'https://openclaw-sandbox.alex-046.workers.dev';
