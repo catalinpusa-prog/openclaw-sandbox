@@ -353,6 +353,21 @@ console.log('Configuration patched successfully');
 EOFPATCH
 
 # ============================================================
+# FORCE INITIAL R2 SYNC (push patched config immediately)
+# ============================================================
+# The background sync loop uses a file-newer-than-marker check.
+# Since the patch above runs BEFORE the loop starts, the marker would be
+# set AFTER the patch, causing the first loop iteration to miss the change.
+# This initial sync ensures the freshly patched config is always in R2.
+if r2_configured; then
+    echo "Syncing patched config to R2..."
+    rclone sync "$CONFIG_DIR/" "r2:${R2_BUCKET}/openclaw/" \
+        $RCLONE_FLAGS --exclude='*.lock' --exclude='*.log' --exclude='*.tmp' --exclude='.git/**' 2>/dev/null \
+        && echo "Initial config sync to R2 complete" \
+        || echo "WARNING: initial config sync to R2 failed (non-fatal)"
+fi
+
+# ============================================================
 # BACKGROUND SYNC LOOP
 # ============================================================
 if r2_configured; then
