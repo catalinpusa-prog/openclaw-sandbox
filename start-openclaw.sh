@@ -136,28 +136,6 @@ else
 fi
 
 # ============================================================
-# INSTALL CLAWHUB SKILLS
-# ============================================================
-# Skills are installed here (before gateway start) so they persist to R2 via
-# the sync loop. Installation is skipped if the skill directory already exists
-# (restored from R2 or previously installed on an earlier container start).
-mkdir -p "$SKILLS_DIR"
-CLAWHUB_SKILLS=(
-    "asleep123/caldav-calendar"
-    "xk103295870-alt/seedance-prompt-wizard"
-    "vassiliylakhonin/vassili-clawhub-cli"
-)
-for skill in "${CLAWHUB_SKILLS[@]}"; do
-    skill_name="${skill##*/}"
-    if [ ! -d "$SKILLS_DIR/$skill_name" ]; then
-        echo "Installing ClawHub skill: $skill ..."
-        openclaw skills install "$skill" 2>&1 && echo "Installed: $skill" || echo "WARNING: failed to install $skill (continuing)"
-    else
-        echo "Skill already present: $skill_name (skipping)"
-    fi
-done
-
-# ============================================================
 # PATCH CONFIG (channels, gateway auth, trusted proxies)
 # ============================================================
 # openclaw onboard handles provider/model config, but we need to patch in:
@@ -503,6 +481,35 @@ message.send.backend.auth.cmd = "echo \$EMAIL_CATALIN_PASSWORD"
 HIMALAYA_EOF
     echo "Himalaya config written (3 accounts)"
 fi
+
+# ============================================================
+# INSTALL CLAWHUB SKILLS (background, non-blocking)
+# ============================================================
+# Runs in background so it doesn't delay gateway startup.
+# Skips skills already present (restored from R2 or previously installed).
+# After install the R2 sync loop will pick them up and persist to R2.
+(
+    mkdir -p "$SKILLS_DIR"
+    CLAWHUB_SKILLS=(
+        "asleep123/caldav-calendar"
+        "xk103295870-alt/seedance-prompt-wizard"
+        "vassiliylakhonin/vassili-clawhub-cli"
+    )
+    sleep 5  # brief delay so gateway starts first
+    for skill in "${CLAWHUB_SKILLS[@]}"; do
+        skill_name="${skill##*/}"
+        if [ ! -d "$SKILLS_DIR/$skill_name" ]; then
+            echo "[skills] Installing: $skill ..."
+            openclaw skills install "$skill" 2>&1 \
+                && echo "[skills] Installed: $skill" \
+                || echo "[skills] WARNING: failed to install $skill"
+        else
+            echo "[skills] Already present: $skill_name (skipping)"
+        fi
+    done
+    echo "[skills] ClawHub install complete"
+) &
+echo "ClawHub skill installation started in background (PID: $!)"
 
 # ============================================================
 # START GATEWAY
