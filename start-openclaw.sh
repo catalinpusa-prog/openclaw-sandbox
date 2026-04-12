@@ -490,21 +490,24 @@ fi
 # After install the R2 sync loop will pick them up and persist to R2.
 (
     mkdir -p "$SKILLS_DIR"
+    # openclaw skills install uses just the slug (no author/ prefix)
+    # Skills are installed into the openclaw workspace: /root/.openclaw/workspace/skills/
+    OPENCLAW_WORKSPACE_SKILLS="/root/.openclaw/workspace/skills"
     CLAWHUB_SKILLS=(
-        "asleep123/caldav-calendar"
-        "xk103295870-alt/seedance-prompt-wizard"
-        "vassiliylakhonin/vassili-clawhub-cli"
+        "caldav-calendar"
+        "seedance-prompt-wizard"
+        "vassili-clawhub-cli"
     )
+    mkdir -p "$OPENCLAW_WORKSPACE_SKILLS"
     sleep 5  # brief delay so gateway starts first
     for skill in "${CLAWHUB_SKILLS[@]}"; do
-        skill_name="${skill##*/}"
-        if [ ! -d "$SKILLS_DIR/$skill_name" ]; then
+        if [ ! -d "$OPENCLAW_WORKSPACE_SKILLS/$skill" ]; then
             echo "[skills] Installing: $skill ..."
             openclaw skills install "$skill" 2>&1 \
                 && echo "[skills] Installed: $skill" \
                 || echo "[skills] WARNING: failed to install $skill"
         else
-            echo "[skills] Already present: $skill_name (skipping)"
+            echo "[skills] Already present: $skill (skipping)"
         fi
     done
     echo "[skills] ClawHub install complete"
