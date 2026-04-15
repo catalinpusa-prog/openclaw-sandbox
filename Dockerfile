@@ -35,7 +35,7 @@ RUN mkdir -p /home/openclaw/.openclaw \
     && ln -sfn /home/openclaw/clawd /root/clawd
 
 # Copy startup script
-RUN echo "cache-bust-2026-04-09-v37-home-openclaw-symlinks"
+RUN echo "cache-bust-2026-04-15-v38-openclaw-2026.4.14"
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 RUN chmod +x /usr/local/bin/start-openclaw.sh
 
